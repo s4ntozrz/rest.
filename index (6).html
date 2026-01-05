@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rast.</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <div class="splash-text">rast.</div>
+        <div class="splash-author">por Gabriel Correia</div>
+    </div>
+
+    <div id="side-menu" class="sidebar">
+        <div class="sidebar-header">
+            <h3>Configurações</h3>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="menu-item">
+                <span class="menu-label">Modo Escuro</span>
+                <label class="switch">
+                    <input type="checkbox" id="menu-theme-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <hr class="menu-divider">
+
+            <div class="menu-section">
+                <h4>MEUS DADOS</h4>
+                <button class="menu-btn" onclick="exportData()">
+                    📤 Exportar Backup
+                </button>
+                <button class="menu-btn" onclick="triggerImport()">
+                    📥 Importar Dados
+                </button>
+                <input type="file" id="import-file" style="display: none;" accept=".json">
+            </div>
+
+            <hr class="menu-divider">
+
+            <div class="menu-section">
+                <button class="menu-btn danger" onclick="resetAllData()">
+                    ⚠️ Redefinir Tudo
+                </button>
+            </div>
+
+            <div class="sidebar-footer">
+                <p>rast. v1.0 beta</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="menu-overlay" onclick="toggleMenuViaOverlay()"></div>
+
+    <header id="app-header">
+        <div class="header-left">
+            <span class="logo">rast.</span>
+        </div>
+        
+        <div class="header-center">
+            <div class="date-info" id="current-date">carregando...</div>
+            <div class="location-info" id="current-location">
+                📍 localizando...
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="menu-icon" onclick="toggleMenu(this)">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="calendar-controls">
+            <button id="prev-month">&lt;</button>
+            <h2 id="month-year-display">Mês Ano</h2>
+            <button id="next-month">&gt;</button>
+        </div>
+
+        <div class="calendar-container">
+            <div class="weekdays">
+                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+            </div>
+            <div class="days" id="calendar-days">
+                </div>
+        </div>
+        
+        <div class="daily-summary-wrapper">
+        <button id="summary-toggle" class="summary-btn">
+            <span class="summary-label">
+                Resumo: <span id="summary-date-display">Selecione um dia</span>
+            </span>
+            <span class="summary-arrow">▼</span>
+        </button>
+        
+        <div id="summary-content" class="summary-content">
+            <div id="summary-list" class="summary-list-inner">
+                <p class="empty-summary">Nenhum registro neste dia.</p>
+            </div>
+        </div>
+    </div>
+    
+
+        <div class="stats-container">
+            <h3 class="section-title">Resumo do Mês</h3>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total Horas</span>
+                    <span class="stat-value" id="total-hours">0h</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Sessões</span>
+                    <span class="stat-value" id="total-sessions">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Média/Dia</span>
+                    <span class="stat-value" id="average-time">0m</span>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="studyChart"></canvas>
+            </div>
+
+            <div class="insight-box">
+                <span class="insight-icon">💡</span>
+                <p id="insight-text">Registre atividades para gerar insights.</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="event-modal" class="modal-overlay">
+        <div class="modal-content">
+            
+            <div class="modal-header">
+                <h3 id="selected-date-title">Data Selecionada</h3>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+
+            <div class="modal-tabs">
+                <button class="tab-btn active" onclick="switchTab('study')">📚 Estudo</button>
+                <button class="tab-btn" onclick="switchTab('agenda')">📅 Agenda</button>
+            </div>
+
+            <div id="tab-study" class="tab-content active">
+                <form id="study-form">
+                    <div class="input-group">
+                        <label>Matéria / Assunto</label>
+                        <input type="text" placeholder="Ex: Javascript - Arrays" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="input-group">
+                            <label>Tempo (min)</label>
+                            <input type="number" placeholder="60">
+                        </div>
+                        <div class="input-group">
+                            <label>Intervalo (min)</label>
+                            <input type="number" placeholder="10">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Notas</label>
+                        <textarea placeholder="Como foi o rendimento?"></textarea>
+                    </div>
+
+                    <button type="submit" class="action-btn">Salvar Sessão</button>
+                </form>
+            </div>
+
+            <div id="tab-agenda" class="tab-content">
+                <form id="agenda-form">
+                    <div class="input-group">
+                        <label>Título do Evento</label>
+                        <input type="text" placeholder="Ex: Prova de Matemática" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="input-group">
+                            <label>Horário</label>
+                            <input type="time">
+                        </div>
+                        <div class="input-group">
+                            <label>Alarme</label>
+                            <select>
+                                <option value="none">Sem alarme</option>
+                                <option value="15">15 min antes</option>
+                                <option value="60">1 hora antes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Observações</label>
+                        <textarea placeholder="Detalhes do evento..."></textarea>
+                    </div>
+
+                    <button type="submit" class="action-btn secondary">Adicionar Evento</button>
+                </form>
+            </div>
+
+            <div id="day-records" class="day-records-list">
+                </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
