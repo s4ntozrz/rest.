@@ -1,2 +1,0 @@
-# rest.
-for every day
