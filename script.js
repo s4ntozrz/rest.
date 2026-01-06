@@ -362,13 +362,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    // ==========================================
-    // 7. MENU E SISTEMA
+// ==========================================
+    // 7. MENU E SISTEMA (ATUALIZADO PARA BARRA DE STATUS)
     // ==========================================
     const sidebar = document.getElementById('side-menu');
     const overlay = document.getElementById('menu-overlay');
     const menuIcon = document.querySelector('.menu-icon');
     const themeSwitch = document.getElementById('menu-theme-toggle');
+
+    // Seleciona a tag que controla a cor da barra do celular
+    const metaThemeColor = document.querySelector("meta[name=theme-color]");
 
     window.toggleMenu = function(x) {
         x.classList.toggle("change");
@@ -382,58 +385,36 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.classList.remove("active");
     }
 
+    // Função que pinta a barra de status
+    function updateStatusBar(isDark) {
+        // Se for escuro, usa a cor #121212 (igual ao CSS body.dark-mode)
+        // Se for claro, usa a cor #f8f9fa (igual ao CSS root)
+        metaThemeColor.setAttribute("content", isDark ? "#121212" : "#f8f9fa");
+    }
+
+    // Lógica do Dark Mode ao Iniciar
     const savedTheme = localStorage.getItem('rast_theme');
     if (savedTheme === 'dark') {
         document.body.classList.add('dark-mode');
         themeSwitch.checked = true;
+        updateStatusBar(true); // Pinta a barra de preto
+    } else {
+        updateStatusBar(false); // Pinta a barra de branco
     }
 
+    // Lógica ao Clicar no Interruptor
     themeSwitch.addEventListener('change', (e) => {
         if (e.target.checked) {
             document.body.classList.add('dark-mode');
             localStorage.setItem('rast_theme', 'dark');
+            updateStatusBar(true); // Mudar para ESCURO
         } else {
             document.body.classList.remove('dark-mode');
             localStorage.setItem('rast_theme', 'light');
+            updateStatusBar(false); // Mudar para CLARO
         }
         updateStats(currentMonth, currentYear);
     });
-
-    window.exportData = function() {
-        const dataToExport = {};
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith('rast_')) dataToExport[key] = localStorage.getItem(key);
-        }
-        let fileName = prompt("Nome do arquivo:", "rast_backup");
-        if (!fileName) return;
-        const dataStr = JSON.stringify(dataToExport, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `${fileName}.json`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    };
-
-    window.triggerImport = function() { document.getElementById('import-file').click(); };
-    document.getElementById('import-file').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                Object.keys(data).forEach(key => { if (key.startsWith('rast_')) localStorage.setItem(key, data[key]); });
-                alert("Importado com sucesso!"); location.reload();
-            } catch (err) { alert("Erro ao ler arquivo."); }
-        };
-        reader.readAsText(file);
-    });
-
-    window.resetAllData = function() {
-        if (confirm("ATENÇÃO: Apagar TUDO?")) { localStorage.clear(); location.reload(); }
-    };
-
 
     // ==========================================
     // 8. INTERFACE DO MODAL
