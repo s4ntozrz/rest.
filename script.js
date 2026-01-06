@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ==========================================
-    // 6. CRUD (SALVAR, EDITAR, EXCLUIR)
+    // 6. CRUD (SALVAR, EDITAR, EXCLUIR) + AUTO SAVE
     // ==========================================
 
     function saveOrUpdateRecord(record) {
@@ -251,6 +251,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const dateParts = currentSelectedDateKey.split('-');
         const dayString = `${dateParts[2]} de ${months[dateParts[1]]}`;
         updateDailySummary(currentSelectedDateKey, dayString);
+
+        // --- TRIGGER AUTOMÁTICO DE UPLOAD ---
+        if (typeof autoSaveToDrive === "function") {
+            autoSaveToDrive();
+        }
     }
 
     document.getElementById('study-form').addEventListener('submit', (e) => {
@@ -342,6 +347,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const dateParts = currentSelectedDateKey.split('-');
         const dayString = `${dateParts[2]} de ${months[dateParts[1]]}`;
         updateDailySummary(currentSelectedDateKey, dayString);
+
+        // --- TRIGGER AUTOMÁTICO DE UPLOAD ---
+        if (typeof autoSaveToDrive === "function") {
+            autoSaveToDrive();
+        }
     };
 
 
@@ -502,9 +512,7 @@ function requestNotificationPermission() {
         alert("Este navegador não suporta notificações de sistema.");
         return;
     }
-
-if (Notification.permission === "granted") return;
-
+    if (Notification.permission === "granted") return;
     if (Notification.permission !== "denied") {
         Notification.requestPermission().then((permission) => {
             if (permission === "granted") {
@@ -555,11 +563,13 @@ function checkAlarms() {
 setInterval(checkAlarms, 60000);
 
 // ==========================================
-// 11. INTEGRAÇÃO GOOGLE DRIVE (CORRIGIDA)
+// 11. INTEGRAÇÃO GOOGLE DRIVE (AUTOMÁTICA)
 // ==========================================
 
+// ⚠️ MANTENHA SUAS CHAVES AQUI
 const API_KEY = 'AIzaSyCiH4-8UWDtnx332M5UiJZBsm0PJUVNG5g';
 const CLIENT_ID = '525104877878-9eog1kg4ftijip7p4cfr26hf3a0rmq3r.apps.googleusercontent.com';
+
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -567,23 +577,15 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
-window.gapiLoaded = function() {
-    gapi.load('client', initializeGapiClient);
-}
-
+window.gapiLoaded = function() { gapi.load('client', initializeGapiClient); }
 async function initializeGapiClient() {
-    await gapi.client.init({
-        apiKey: API_KEY,
-        discoveryDocs: [DISCOVERY_DOC],
-    });
+    await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
     gapiInited = true;
 }
 
 window.gisLoaded = function() {
     tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        callback: '',
+        client_id: CLIENT_ID, scope: SCOPES, callback: '',
     });
     gisInited = true;
 }
@@ -598,13 +600,14 @@ script2.src = "https://accounts.google.com/gsi/client";
 script2.onload = window.gisLoaded;
 document.head.appendChild(script2);
 
+// BOTÃO DE LOGIN MANUAL
 window.handleAuthClick = function() {
     const btn = document.getElementById('google-sync-btn');
     btn.textContent = "⌛ Conectando...";
 
     tokenClient.callback = async (resp) => {
         if (resp.error) throw (resp);
-        await syncDriveData();
+        await syncDriveData(false); // Falso = Modo Manual (Pergunta)
     };
 
     if (gapi.client.getToken() === null) {
@@ -614,14 +617,15 @@ window.handleAuthClick = function() {
     }
 }
 
-async function syncDriveData() {
+// FUNÇÃO PRINCIPAL DE SINCRONIZAÇÃO
+async function syncDriveData(silent = false) {
     const btn = document.getElementById('google-sync-btn');
-    btn.textContent = "🔄 Verificando...";
+    if (!silent) btn.textContent = "🔄 ...";
 
     try {
         const response = await gapi.client.drive.files.list({
             q: "name = 'rast_backup.json' and trashed = false",
-            fields: 'files(id, name)',
+            fields: 'files(id, modifiedTime)',
             spaces: 'drive'
         });
 
@@ -629,35 +633,43 @@ async function syncDriveData() {
 
         if (files && files.length > 0) {
             const fileId = files[0].id;
-            const userChoice = confirm("Encontrei um backup no seu Google Drive!\n\n[OK] para BAIXAR do Drive.\n[CANCELAR] para SUBIR dados locais.");
             
-            if (userChoice) {
-                btn.textContent = "⬇️ Baixando...";
-                const content = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
-                const data = content.result;
-                localStorage.clear();
-                Object.keys(data).forEach(key => { if (key.startsWith('rast_')) localStorage.setItem(key, data[key]); });
-                alert("Dados recuperados!");
-                location.reload();
-            } else {
-                btn.textContent = "⬆️ Subindo...";
+            // LÓGICA AUTOMÁTICA
+            if (silent) {
+                // Se foi chamado silenciosamente (por salvar), apenas sobe
                 await updateFile(fileId);
-                alert("Backup atualizado!");
-                btn.textContent = "☁️ Sincronizar Google Drive";
+                console.log("Upload automático concluído.");
+            } else {
+                // Modo Manual
+                const userChoice = confirm("Backup encontrado!\n[OK] Baixar do Drive\n[CANCELAR] Subir Local");
+                if (userChoice) {
+                    const content = await gapi.client.drive.files.get({fileId: fileId, alt: 'media'});
+                    updateLocalStorageFromDrive(content.result, false);
+                } else {
+                    await updateFile(fileId);
+                    alert("Salvo no Drive!");
+                }
             }
+            
+            // Salva timestamp para o vigia
+            localStorage.setItem('rast_last_sync', Date.now());
+
         } else {
-            btn.textContent = "⬆️ Criando Backup...";
-            await createNewFile();
-            alert("Backup criado!");
-            btn.textContent = "☁️ Sincronizar Google Drive";
+            // Se não existe, cria (mesmo no modo silencioso)
+            if (silent || confirm("Criar primeiro backup no Drive?")) {
+                await createNewFile();
+                if(!silent) alert("Backup criado!");
+            }
         }
     } catch (err) {
         console.error(err);
-        alert("Erro: " + err.message);
-        btn.textContent = "❌ Erro";
+        if (!silent) alert("Erro sync: " + err.message);
+    } finally {
+        if (!silent) btn.textContent = "☁️ Sincronizar Google Drive";
     }
 }
 
+// FUNÇÕES AUXILIARES DE DRIVE
 function getLocalData() {
     const dataToExport = {};
     for (let i = 0; i < localStorage.length; i++) {
@@ -665,6 +677,13 @@ function getLocalData() {
         if (key.startsWith('rast_')) dataToExport[key] = localStorage.getItem(key);
     }
     return JSON.stringify(dataToExport, null, 2);
+}
+
+function updateLocalStorageFromDrive(data, silent) {
+    localStorage.clear();
+    Object.keys(data).forEach(key => { if (key.startsWith('rast_')) localStorage.setItem(key, data[key]); });
+    if (!silent) alert("Dados atualizados!");
+    location.reload();
 }
 
 async function createNewFile() {
@@ -695,4 +714,51 @@ async function updateFile(fileId) {
         headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
         body: form
     });
+}
+
+// ==========================================
+// 12. TRIGGERS AUTOMÁTICOS
+// ==========================================
+
+// Trigger de Upload Automático (Chamado ao salvar/deletar)
+window.autoSaveToDrive = function() {
+    if (gapiInited && gapi.client.getToken()) {
+        syncDriveData(true); // Modo silencioso = true
+    }
+}
+
+// Trigger de Download Automático (Monitoramento a cada 60s)
+setInterval(() => {
+    if (gapiInited && gapi.client.getToken()) {
+        checkForRemoteUpdates();
+    }
+}, 60000);
+
+async function checkForRemoteUpdates() {
+    try {
+        const response = await gapi.client.drive.files.list({
+            q: "name = 'rast_backup.json' and trashed = false",
+            fields: 'files(id, modifiedTime)',
+            spaces: 'drive'
+        });
+
+        const files = response.result.files;
+        if (files && files.length > 0) {
+            const remoteTime = new Date(files[0].modifiedTime).getTime();
+            const lastSync = parseInt(localStorage.getItem('rast_last_sync') || '0');
+
+            // Se o arquivo do Drive for mais novo que nossa última sincronização (+ margem de 10s)
+            if (remoteTime > (lastSync + 10000)) {
+                console.log("Nova versão encontrada no Drive! Baixando...");
+                const fileId = files[0].id;
+                const content = await gapi.client.drive.files.get({fileId: fileId, alt: 'media'});
+                
+                // Atualiza timestamp e recarrega
+                localStorage.setItem('rast_last_sync', Date.now());
+                updateLocalStorageFromDrive(content.result, true); // true = sem alerta, só reload
+            }
+        }
+    } catch (err) {
+        console.log("Erro no check automático (ignore se offline):", err);
+    }
 }
