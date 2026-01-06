@@ -346,14 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ==========================================
-    // 7. MENU, TEMA E STATUS BAR (ATUALIZADO)
+    // 7. MENU, TEMA E STATUS BAR
     // ==========================================
     const sidebar = document.getElementById('side-menu');
     const overlay = document.getElementById('menu-overlay');
     const menuIcon = document.querySelector('.menu-icon');
     const themeSwitch = document.getElementById('menu-theme-toggle');
-    
-    // Seleciona o META TAG da cor do navegador
     const metaThemeColor = document.querySelector("meta[name=theme-color]");
 
     window.toggleMenu = function(x) {
@@ -368,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.classList.remove("active");
     }
 
-    // Função que muda a cor da barra de status
     function updateStatusBar(isDark) {
         if (metaThemeColor) {
             metaThemeColor.setAttribute("content", isDark ? "#121212" : "#f8f9fa");
@@ -497,275 +494,205 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-    // 10. SISTEMA DE NOTIFICAÇÕES E ALARMES (NOVO)
-    // ==========================================
+// 10. SISTEMA DE NOTIFICAÇÕES E ALARMES
+// ==========================================
 
-    // 1. Pedir permissão para notificar
-    function requestNotificationPermission() {
-        if (!("Notification" in window)) {
-            alert("Este navegador não suporta notificações de sistema.");
-            return;
-        }
-
-        if (Notification.permission === "granted") {
-            return; // Já temos permissão
-        }
-
-        if (Notification.permission !== "denied") {
-            Notification.requestPermission().then((permission) => {
-                if (permission === "granted") {
-                    new Notification("rast.", {
-                        body: "Notificações ativadas! Você será avisado dos seus eventos.",
-                        icon: "icon-192.png"
-                    });
-                }
-            });
-        }
+function requestNotificationPermission() {
+    if (!("Notification" in window)) {
+        alert("Este navegador não suporta notificações de sistema.");
+        return;
     }
 
-    // Chama o pedido de permissão assim que o usuário interagir com o app (ex: ao abrir o menu)
-    // Ou você pode chamar direto no final do arquivo, mas navegadores preferem que seja após um clique.
-    // Vamos adicionar ao botão de salvar agenda para garantir.
+if (Notification.permission === "granted") return;
 
-    // 2. O "Vigia" que checa os horários a cada minuto
-    function checkAlarms() {
-        if (Notification.permission !== "granted") return;
-
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMin = now.getMinutes();
-
-        // Formata a data de hoje para buscar no localStorage (ano-mes-dia)
-        // Nota: no script principal usamos meses 0-11, aqui precisamos alinhar
-        const y = now.getFullYear();
-        const m = now.getMonth(); 
-        const d = now.getDate();
-        
-        // Chave do dia de hoje
-        const todayKey = `rast_${y}-${m}-${d}`;
-        const records = JSON.parse(localStorage.getItem(todayKey)) || [];
-
-        records.forEach(item => {
-            // Só interessa se for Agenda e tiver alarme configurado
-            if (item.type === 'agenda' && item.rawTime && item.detail.includes('antes')) {
-                
-                // Pega o horário do evento (ex: "14:30")
-                const [eventH, eventM] = item.rawTime.split(':').map(Number);
-                
-                // Descobre de quantos minutos é o alarme (15 ou 60)
-                let alarmOffset = 0;
-                if (item.detail.includes('15 min')) alarmOffset = 15;
-                if (item.detail.includes('1 hora')) alarmOffset = 60;
-
-                if (alarmOffset === 0) return;
-
-                // Cria data do evento
-                const eventDate = new Date();
-                eventDate.setHours(eventH, eventM, 0);
-
-                // Subtrai o tempo do alarme para saber a "Hora de Disparar"
-                const triggerDate = new Date(eventDate.getTime() - (alarmOffset * 60000));
-                
-                // Verifica se AGORA é o momento exato (comparando hora e minuto)
-                if (triggerDate.getHours() === currentHour && triggerDate.getMinutes() === currentMin) {
-                    
-                    // Para não floodar, verificamos se já foi notificado (podemos usar uma flag no item, 
-                    // mas para simplificar, confiamos que o minuto passa rápido. 
-                    // O ideal é usar uma tag na notificação).
-                    
-                    new Notification(`Lembrete: ${item.title}`, {
-                        body: `Seu evento é às ${item.rawTime}. Prepare-se!`,
-                        icon: "icon-192.png",
-                        tag: `alarm-${item.id}` // Evita notificações duplicadas
-                    });
-                }
+    if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+                new Notification("rast.", {
+                    body: "Notificações ativadas!",
+                    icon: "icon-192.png"
+                });
             }
         });
     }
+}
 
-    // Inicia o vigia (roda a cada 60 segundos)
-    setInterval(checkAlarms, 60000);
+function checkAlarms() {
+    if (Notification.permission !== "granted") return;
 
-    // DICA: Adicione a chamada requestNotificationPermission() 
-    // dentro do evento de 'submit' do formulário da agenda.
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+    const y = now.getFullYear();
+    const m = now.getMonth(); 
+    const d = now.getDate();
     
-    // ==========================================
-    // 11. INTEGRAÇÃO GOOGLE DRIVE (KATCHAU!) ⚡
-    // ==========================================
-    
-    // ⚠️ SUBSTITUA COM SUAS CHAVES REAIS DO GOOGLE CLOUD CONSOLE ⚠️
-    const API_KEY = 'AIzaSyCiH4-8UWDtnx332M5UiJZBsm0PJUVNG5g';
-    const CLIENT_ID = '525104877878-9eog1kg4ftijip7p4cfr26hf3a0rmq3r.apps.googleusercontent.com';
-    
-    // Configurações
-    const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-    // Escopo: Apenas arquivos criados/abertos por este app (mais seguro e evita alertas)
-    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    const todayKey = `rast_${y}-${m}-${d}`;
+    const records = JSON.parse(localStorage.getItem(todayKey)) || [];
 
-    let tokenClient;
-    let gapiInited = false;
-    let gisInited = false;
+    records.forEach(item => {
+        if (item.type === 'agenda' && item.rawTime && item.detail.includes('antes')) {
+            const [eventH, eventM] = item.rawTime.split(':').map(Number);
+            let alarmOffset = 0;
+            if (item.detail.includes('15 min')) alarmOffset = 15;
+            if (item.detail.includes('1 hora')) alarmOffset = 60;
+            if (alarmOffset === 0) return;
 
-    // Inicializa a biblioteca de API (gapi)
-    window.gapiLoaded = function() {
-        gapi.load('client', initializeGapiClient);
-    }
-
-    async function initializeGapiClient() {
-        await gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: [DISCOVERY_DOC],
-        });
-        gapiInited = true;
-    }
-
-    // Inicializa a biblioteca de Identidade (GIS)
-    window.gisLoaded = function() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPES,
-            callback: '', // Será definido no clique
-        });
-        gisInited = true;
-    }
-
-    // Carrega as libs ao iniciar
-    const script1 = document.createElement('script');
-    script1.src = "https://apis.google.com/js/api.js";
-    script1.onload = window.gapiLoaded;
-    document.head.appendChild(script1);
-
-    const script2 = document.createElement('script');
-    script2.src = "https://accounts.google.com/gsi/client";
-    script2.onload = window.gisLoaded;
-    document.head.appendChild(script2);
-
-    // --- FUNÇÃO PRINCIPAL: BOTÃO DE SYNC ---
-    window.handleAuthClick = function() {
-        const btn = document.getElementById('google-sync-btn');
-        btn.textContent = "⌛ Conectando...";
-
-        tokenClient.callback = async (resp) => {
-            if (resp.error) {
-                throw (resp);
+            const eventDate = new Date();
+            eventDate.setHours(eventH, eventM, 0);
+            const triggerDate = new Date(eventDate.getTime() - (alarmOffset * 60000));
+            
+            if (triggerDate.getHours() === currentHour && triggerDate.getMinutes() === currentMin) {
+                new Notification(`Lembrete: ${item.title}`, {
+                    body: `Seu evento é às ${item.rawTime}. Prepare-se!`,
+                    icon: "icon-192.png",
+                    tag: `alarm-${item.id}`
+                });
             }
-            await syncDriveData();
-        };
-
-        if (gapi.client.getToken() === null) {
-            tokenClient.requestAccessToken({prompt: 'consent'});
-        } else {
-            tokenClient.requestAccessToken({prompt: ''});
         }
+    });
+}
+setInterval(checkAlarms, 60000);
+
+// ==========================================
+// 11. INTEGRAÇÃO GOOGLE DRIVE (CORRIGIDA)
+// ==========================================
+
+const API_KEY = 'AIzaSyCiH4-8UWDtnx332M5UiJZBsm0PJUVNG5g';
+const CLIENT_ID = '525104877878-9eog1kg4ftijip7p4cfr26hf3a0rmq3r.apps.googleusercontent.com';
+const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+
+window.gapiLoaded = function() {
+    gapi.load('client', initializeGapiClient);
+}
+
+async function initializeGapiClient() {
+    await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: [DISCOVERY_DOC],
+    });
+    gapiInited = true;
+}
+
+window.gisLoaded = function() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: '',
+    });
+    gisInited = true;
+}
+
+const script1 = document.createElement('script');
+script1.src = "https://apis.google.com/js/api.js";
+script1.onload = window.gapiLoaded;
+document.head.appendChild(script1);
+
+const script2 = document.createElement('script');
+script2.src = "https://accounts.google.com/gsi/client";
+script2.onload = window.gisLoaded;
+document.head.appendChild(script2);
+
+window.handleAuthClick = function() {
+    const btn = document.getElementById('google-sync-btn');
+    btn.textContent = "⌛ Conectando...";
+
+    tokenClient.callback = async (resp) => {
+        if (resp.error) throw (resp);
+        await syncDriveData();
+    };
+
+    if (gapi.client.getToken() === null) {
+        tokenClient.requestAccessToken({prompt: 'consent'});
+    } else {
+        tokenClient.requestAccessToken({prompt: ''});
     }
+}
 
-    // Lógica de Sincronização
-    async function syncDriveData() {
-        const btn = document.getElementById('google-sync-btn');
-        btn.textContent = "🔄 Verificando...";
+async function syncDriveData() {
+    const btn = document.getElementById('google-sync-btn');
+    btn.textContent = "🔄 Verificando...";
 
-        try {
-            // 1. Procura se já existe backup nosso lá
-            const response = await gapi.client.drive.files.list({
-                q: "name = 'rast_backup.json' and trashed = false",
-                fields: 'files(id, name)',
-                spaces: 'drive'
-            });
+    try {
+        const response = await gapi.client.drive.files.list({
+            q: "name = 'rast_backup.json' and trashed = false",
+            fields: 'files(id, name)',
+            spaces: 'drive'
+        });
 
-            const files = response.result.files;
+        const files = response.result.files;
 
-            if (files && files.length > 0) {
-                // ARQUIVO EXISTE NO DRIVE
-                const fileId = files[0].id;
-                
-                const userChoice = confirm("Encontrei um backup no seu Google Drive!\n\n[OK] para BAIXAR do Drive (Substitui dados atuais).\n[CANCELAR] para SUBIR dados locais (Atualiza o Drive).");
-                
-                if (userChoice) {
-                    // BAIXAR (Download)
-                    btn.textContent = "⬇️ Baixando...";
-                    const content = await gapi.client.drive.files.get({
-                        fileId: fileId,
-                        alt: 'media'
-                    });
-                    
-                    const data = content.result;
-                    // Salva no LocalStorage
-                    localStorage.clear(); // Limpa para evitar conflito
-                    Object.keys(data).forEach(key => {
-                         if (key.startsWith('rast_')) localStorage.setItem(key, data[key]);
-                    });
-                    
-                    alert("Dados recuperados do Drive com sucesso!");
-                    location.reload();
-                } else {
-                    // SUBIR (Update)
-                    btn.textContent = "⬆️ Subindo...";
-                    await updateFile(fileId);
-                    alert("Backup atualizado no Drive!");
-                    btn.textContent = "☁️ Sincronizar Google Drive";
-                }
+        if (files && files.length > 0) {
+            const fileId = files[0].id;
+            const userChoice = confirm("Encontrei um backup no seu Google Drive!\n\n[OK] para BAIXAR do Drive.\n[CANCELAR] para SUBIR dados locais.");
+            
+            if (userChoice) {
+                btn.textContent = "⬇️ Baixando...";
+                const content = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+                const data = content.result;
+                localStorage.clear();
+                Object.keys(data).forEach(key => { if (key.startsWith('rast_')) localStorage.setItem(key, data[key]); });
+                alert("Dados recuperados!");
+                location.reload();
             } else {
-                // ARQUIVO NÃO EXISTE (Primeiro Upload)
-                btn.textContent = "⬆️ Criando Backup...";
-                await createNewFile();
-                alert("Backup criado no Google Drive!");
+                btn.textContent = "⬆️ Subindo...";
+                await updateFile(fileId);
+                alert("Backup atualizado!");
                 btn.textContent = "☁️ Sincronizar Google Drive";
             }
-
-        } catch (err) {
-            console.error(err);
-            alert("Erro na sincronização: " + err.message);
-            btn.textContent = "❌ Erro";
+        } else {
+            btn.textContent = "⬆️ Criando Backup...";
+            await createNewFile();
+            alert("Backup criado!");
+            btn.textContent = "☁️ Sincronizar Google Drive";
         }
+    } catch (err) {
+        console.error(err);
+        alert("Erro: " + err.message);
+        btn.textContent = "❌ Erro";
     }
+}
 
-    // Auxiliar: Preparar dados locais para JSON
-    function getLocalData() {
-        const dataToExport = {};
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith('rast_')) {
-                dataToExport[key] = localStorage.getItem(key);
-            }
-        }
-        return JSON.stringify(dataToExport, null, 2);
+function getLocalData() {
+    const dataToExport = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('rast_')) dataToExport[key] = localStorage.getItem(key);
     }
+    return JSON.stringify(dataToExport, null, 2);
+}
 
-    // Auxiliar: Criar arquivo novo
-    async function createNewFile() {
-        const fileContent = getLocalData();
-        const file = new Blob([fileContent], {type: 'application/json'});
-        const metadata = {
-            'name': 'rast_backup.json', // Nome fixo para a gente achar depois
-            'mimeType': 'application/json'
-        };
+async function createNewFile() {
+    const fileContent = getLocalData();
+    const file = new Blob([fileContent], {type: 'application/json'});
+    const metadata = { 'name': 'rast_backup.json', 'mimeType': 'application/json' };
+    const accessToken = gapi.client.getToken().access_token;
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+    form.append('file', file);
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+        body: form
+    });
+}
 
-        const accessToken = gapi.client.getToken().access_token;
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-        form.append('file', file);
-
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
-            body: form
-        });
-    }
-
-    // Auxiliar: Atualizar arquivo existente
-    async function updateFile(fileId) {
-        const fileContent = getLocalData();
-        const file = new Blob([fileContent], {type: 'application/json'});
-        const metadata = { 'mimeType': 'application/json' };
-
-        const accessToken = gapi.client.getToken().access_token;
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-        form.append('file', file);
-
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
-            method: 'PATCH',
-            headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
-            body: form
-        });
-    }
+async function updateFile(fileId) {
+    const fileContent = getLocalData();
+    const file = new Blob([fileContent], {type: 'application/json'});
+    const metadata = { 'mimeType': 'application/json' };
+    const accessToken = gapi.client.getToken().access_token;
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+    form.append('file', file);
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
+        method: 'PATCH',
+        headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+        body: form
+    });
+}

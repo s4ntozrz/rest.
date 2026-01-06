@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rast-v1';
+const CACHE_NAME = 'rast-v2-google'; // Qualquer nome diferente força a atualização
 const ASSETS = [
   './',
   './index.html',

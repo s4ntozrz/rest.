@@ -6,18 +6,22 @@
     <title>rast.</title>
     
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#f8f9fa">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#f8f9fa">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="rast.">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js" async defer></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
 </head>
 <body>
 
@@ -50,11 +54,13 @@
                 <button class="menu-btn" onclick="triggerImport()">
                     📥 Importar Dados
                 </button>
+                
+                <button id="google-sync-btn" class="menu-btn" onclick="handleAuthClick()">
+                    ☁️ Sincronizar Google Drive
+                </button>
+
                 <input type="file" id="import-file" style="display: none;" accept=".json">
             </div>
-            <button id="google-sync-btn" class="menu-btn" onclick="handleAuthClick()">
-    ☁️ Sincronizar Google Drive
-</button>
 
             <hr class="menu-divider">
 
@@ -109,20 +115,19 @@
         </div>
         
         <div class="daily-summary-wrapper">
-        <button id="summary-toggle" class="summary-btn">
-            <span class="summary-label">
-                Resumo: <span id="summary-date-display">Selecione um dia</span>
-            </span>
-            <span class="summary-arrow">▼</span>
-        </button>
-        
-        <div id="summary-content" class="summary-content">
-            <div id="summary-list" class="summary-list-inner">
-                <p class="empty-summary">Nenhum registro neste dia.</p>
+            <button id="summary-toggle" class="summary-btn">
+                <span class="summary-label">
+                    Resumo: <span id="summary-date-display">Selecione um dia</span>
+                </span>
+                <span class="summary-arrow">▼</span>
+            </button>
+            
+            <div id="summary-content" class="summary-content">
+                <div id="summary-list" class="summary-list-inner">
+                    <p class="empty-summary">Nenhum registro neste dia.</p>
+                </div>
             </div>
         </div>
-    </div>
-    
 
         <div class="stats-container">
             <h3 class="section-title">Resumo do Mês</h3>
@@ -241,7 +246,7 @@
                 .catch(err => console.log('Erro PWA:', err));
         });
     }
-</script>
+    </script>
 
 </body>
 </html>
