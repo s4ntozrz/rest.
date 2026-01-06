@@ -15,7 +15,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -51,6 +52,9 @@
                 </button>
                 <input type="file" id="import-file" style="display: none;" accept=".json">
             </div>
+            <button id="google-sync-btn" class="menu-btn" onclick="handleAuthClick()">
+    ☁️ Sincronizar Google Drive
+</button>
 
             <hr class="menu-divider">
 

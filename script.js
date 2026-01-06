@@ -588,3 +588,184 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // DICA: Adicione a chamada requestNotificationPermission() 
     // dentro do evento de 'submit' do formulário da agenda.
+    
+    // ==========================================
+    // 11. INTEGRAÇÃO GOOGLE DRIVE (KATCHAU!) ⚡
+    // ==========================================
+    
+    // ⚠️ SUBSTITUA COM SUAS CHAVES REAIS DO GOOGLE CLOUD CONSOLE ⚠️
+    const API_KEY = 'AIzaSyCiH4-8UWDtnx332M5UiJZBsm0PJUVNG5g';
+    const CLIENT_ID = '525104877878-9eog1kg4ftijip7p4cfr26hf3a0rmq3r.apps.googleusercontent.com';
+    
+    // Configurações
+    const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+    // Escopo: Apenas arquivos criados/abertos por este app (mais seguro e evita alertas)
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    // Inicializa a biblioteca de API (gapi)
+    window.gapiLoaded = function() {
+        gapi.load('client', initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: [DISCOVERY_DOC],
+        });
+        gapiInited = true;
+    }
+
+    // Inicializa a biblioteca de Identidade (GIS)
+    window.gisLoaded = function() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '', // Será definido no clique
+        });
+        gisInited = true;
+    }
+
+    // Carrega as libs ao iniciar
+    const script1 = document.createElement('script');
+    script1.src = "https://apis.google.com/js/api.js";
+    script1.onload = window.gapiLoaded;
+    document.head.appendChild(script1);
+
+    const script2 = document.createElement('script');
+    script2.src = "https://accounts.google.com/gsi/client";
+    script2.onload = window.gisLoaded;
+    document.head.appendChild(script2);
+
+    // --- FUNÇÃO PRINCIPAL: BOTÃO DE SYNC ---
+    window.handleAuthClick = function() {
+        const btn = document.getElementById('google-sync-btn');
+        btn.textContent = "⌛ Conectando...";
+
+        tokenClient.callback = async (resp) => {
+            if (resp.error) {
+                throw (resp);
+            }
+            await syncDriveData();
+        };
+
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+    }
+
+    // Lógica de Sincronização
+    async function syncDriveData() {
+        const btn = document.getElementById('google-sync-btn');
+        btn.textContent = "🔄 Verificando...";
+
+        try {
+            // 1. Procura se já existe backup nosso lá
+            const response = await gapi.client.drive.files.list({
+                q: "name = 'rast_backup.json' and trashed = false",
+                fields: 'files(id, name)',
+                spaces: 'drive'
+            });
+
+            const files = response.result.files;
+
+            if (files && files.length > 0) {
+                // ARQUIVO EXISTE NO DRIVE
+                const fileId = files[0].id;
+                
+                const userChoice = confirm("Encontrei um backup no seu Google Drive!\n\n[OK] para BAIXAR do Drive (Substitui dados atuais).\n[CANCELAR] para SUBIR dados locais (Atualiza o Drive).");
+                
+                if (userChoice) {
+                    // BAIXAR (Download)
+                    btn.textContent = "⬇️ Baixando...";
+                    const content = await gapi.client.drive.files.get({
+                        fileId: fileId,
+                        alt: 'media'
+                    });
+                    
+                    const data = content.result;
+                    // Salva no LocalStorage
+                    localStorage.clear(); // Limpa para evitar conflito
+                    Object.keys(data).forEach(key => {
+                         if (key.startsWith('rast_')) localStorage.setItem(key, data[key]);
+                    });
+                    
+                    alert("Dados recuperados do Drive com sucesso!");
+                    location.reload();
+                } else {
+                    // SUBIR (Update)
+                    btn.textContent = "⬆️ Subindo...";
+                    await updateFile(fileId);
+                    alert("Backup atualizado no Drive!");
+                    btn.textContent = "☁️ Sincronizar Google Drive";
+                }
+            } else {
+                // ARQUIVO NÃO EXISTE (Primeiro Upload)
+                btn.textContent = "⬆️ Criando Backup...";
+                await createNewFile();
+                alert("Backup criado no Google Drive!");
+                btn.textContent = "☁️ Sincronizar Google Drive";
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert("Erro na sincronização: " + err.message);
+            btn.textContent = "❌ Erro";
+        }
+    }
+
+    // Auxiliar: Preparar dados locais para JSON
+    function getLocalData() {
+        const dataToExport = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('rast_')) {
+                dataToExport[key] = localStorage.getItem(key);
+            }
+        }
+        return JSON.stringify(dataToExport, null, 2);
+    }
+
+    // Auxiliar: Criar arquivo novo
+    async function createNewFile() {
+        const fileContent = getLocalData();
+        const file = new Blob([fileContent], {type: 'application/json'});
+        const metadata = {
+            'name': 'rast_backup.json', // Nome fixo para a gente achar depois
+            'mimeType': 'application/json'
+        };
+
+        const accessToken = gapi.client.getToken().access_token;
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+        form.append('file', file);
+
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+            body: form
+        });
+    }
+
+    // Auxiliar: Atualizar arquivo existente
+    async function updateFile(fileId) {
+        const fileContent = getLocalData();
+        const file = new Blob([fileContent], {type: 'application/json'});
+        const metadata = { 'mimeType': 'application/json' };
+
+        const accessToken = gapi.client.getToken().access_token;
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+        form.append('file', file);
+
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
+            method: 'PATCH',
+            headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+            body: form
+        });
+    }
