@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
     
-    // --- VARIÁVEIS DE EDIÇÃO (NOVO) ---
+    // Variáveis de Edição
     let isEditMode = false;
     let editId = null;
     
@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dayString = `${i} de ${months[month]}`;
                 const key = `${year}-${month}-${i}`;
                 currentSelectedDateKey = key;
-                resetFormState(); // Garante que abre limpo, sem edição pendente
+                resetFormState(); 
                 openModal(dayString);
                 updateDailySummary(key, dayString);
             });
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ==========================================
-    // 6. SALVAMENTO, EDIÇÃO E EXCLUSÃO (CORE)
+    // 6. CRUD (SALVAR, EDITAR, EXCLUIR)
     // ==========================================
 
     function saveOrUpdateRecord(record) {
@@ -233,31 +233,26 @@ document.addEventListener('DOMContentLoaded', () => {
         let records = JSON.parse(localStorage.getItem(storageKey)) || [];
 
         if (isEditMode && editId) {
-            // MODO EDIÇÃO: Substitui o item existente
             const index = records.findIndex(r => r.id === editId);
             if (index !== -1) {
-                // Mantém o ID original para não quebrar lógica de data/turno
                 record.id = editId; 
                 records[index] = record;
             }
         } else {
-            // MODO CRIAÇÃO: Adiciona novo
             records.push(record);
         }
         
         localStorage.setItem(storageKey, JSON.stringify(records));
         
-        resetFormState(); // Sai do modo edição e limpa forms
+        resetFormState();
         renderDayRecords(); 
         renderCalendar(currentMonth, currentYear); 
         
-        // Atualiza resumo
         const dateParts = currentSelectedDateKey.split('-');
         const dayString = `${dateParts[2]} de ${months[dateParts[1]]}`;
         updateDailySummary(currentSelectedDateKey, dayString);
     }
 
-    // --- FORMULÁRIO ESTUDO ---
     document.getElementById('study-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const subject = e.target.querySelector('input[type="text"]').value;
@@ -265,16 +260,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const notes = e.target.querySelector('textarea').value;
 
         saveOrUpdateRecord({
-            id: Date.now(), // Será sobrescrito se for edição
+            id: Date.now(),
             type: 'study',
             title: subject,
             detail: `${timeInput} min`,
             notes: notes,
-            rawTime: timeInput // Guarda o número puro para facilitar edição futura
+            rawTime: timeInput
         });
     });
 
-    // --- FORMULÁRIO AGENDA ---
     document.getElementById('agenda-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const title = e.target.querySelector('input[type="text"]').value;
@@ -291,7 +285,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- FUNÇÃO DE INICIAR EDIÇÃO ---
     window.startEdit = function(id) {
         const storageKey = `rast_${currentSelectedDateKey}`;
         const records = JSON.parse(localStorage.getItem(storageKey)) || [];
@@ -299,20 +292,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!item) return;
 
-        // 1. Ativa Modo Edição
         isEditMode = true;
         editId = id;
 
-        // 2. Troca para a aba correta e preenche inputs
         if (item.type === 'study') {
             switchTab('study');
             const form = document.getElementById('study-form');
             form.querySelector('input[type="text"]').value = item.title;
-            // Tenta pegar o tempo cru (rawTime) ou extrai do texto "60 min"
             const timeVal = item.rawTime || parseInt(item.detail); 
             form.querySelector('input[placeholder="60"]').value = timeVal;
             form.querySelector('textarea').value = item.notes;
-            form.querySelector('button').textContent = "Atualizar Sessão"; // Muda texto do botão
+            form.querySelector('button').textContent = "Atualizar Sessão"; 
         } else {
             switchTab('agenda');
             const form = document.getElementById('agenda-form');
@@ -320,28 +310,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const timeVal = item.rawTime || item.detail.replace('Horário: ', '').trim();
             form.querySelector('input[type="time"]').value = timeVal;
             form.querySelector('textarea').value = item.notes;
-            form.querySelector('button').textContent = "Atualizar Evento"; // Muda texto do botão
+            form.querySelector('button').textContent = "Atualizar Evento"; 
         }
 
-        // Rola suavemente para o topo do modal para ver o form
         document.querySelector('.modal-content').scrollTop = 0;
     };
 
-    // --- FUNÇÃO PARA LIMPAR ESTADO DO FORM ---
     function resetFormState() {
         isEditMode = false;
         editId = null;
-        
-        // Limpa forms
         document.getElementById('study-form').reset();
         document.getElementById('agenda-form').reset();
-        
-        // Volta botões ao texto original
         document.querySelector('#study-form button').textContent = "Salvar Sessão";
         document.querySelector('#agenda-form button').textContent = "Adicionar Evento";
     }
 
-    // --- FUNÇÃO EXCLUIR ---
     window.deleteRecord = function(id) {
         if(!confirm("Deseja realmente excluir?")) return;
 
@@ -350,7 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
         records = records.filter(record => record.id !== id);
         localStorage.setItem(storageKey, JSON.stringify(records));
         
-        // Se estava editando esse item, cancela a edição
         if (isEditMode && editId === id) resetFormState();
 
         renderDayRecords();
@@ -362,15 +344,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-// ==========================================
-    // 7. MENU E SISTEMA (ATUALIZADO PARA BARRA DE STATUS)
+    // ==========================================
+    // 7. MENU, TEMA E STATUS BAR (ATUALIZADO)
     // ==========================================
     const sidebar = document.getElementById('side-menu');
     const overlay = document.getElementById('menu-overlay');
     const menuIcon = document.querySelector('.menu-icon');
     const themeSwitch = document.getElementById('menu-theme-toggle');
-
-    // Seleciona a tag que controla a cor da barra do celular
+    
+    // Seleciona o META TAG da cor do navegador
     const metaThemeColor = document.querySelector("meta[name=theme-color]");
 
     window.toggleMenu = function(x) {
@@ -385,36 +367,70 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.classList.remove("active");
     }
 
-    // Função que pinta a barra de status
+    // Função que muda a cor da barra de status
     function updateStatusBar(isDark) {
-        // Se for escuro, usa a cor #121212 (igual ao CSS body.dark-mode)
-        // Se for claro, usa a cor #f8f9fa (igual ao CSS root)
-        metaThemeColor.setAttribute("content", isDark ? "#121212" : "#f8f9fa");
+        if (metaThemeColor) {
+            metaThemeColor.setAttribute("content", isDark ? "#121212" : "#f8f9fa");
+        }
     }
 
-    // Lógica do Dark Mode ao Iniciar
     const savedTheme = localStorage.getItem('rast_theme');
     if (savedTheme === 'dark') {
         document.body.classList.add('dark-mode');
         themeSwitch.checked = true;
-        updateStatusBar(true); // Pinta a barra de preto
+        updateStatusBar(true);
     } else {
-        updateStatusBar(false); // Pinta a barra de branco
+        updateStatusBar(false);
     }
 
-    // Lógica ao Clicar no Interruptor
     themeSwitch.addEventListener('change', (e) => {
         if (e.target.checked) {
             document.body.classList.add('dark-mode');
             localStorage.setItem('rast_theme', 'dark');
-            updateStatusBar(true); // Mudar para ESCURO
+            updateStatusBar(true);
         } else {
             document.body.classList.remove('dark-mode');
             localStorage.setItem('rast_theme', 'light');
-            updateStatusBar(false); // Mudar para CLARO
+            updateStatusBar(false);
         }
         updateStats(currentMonth, currentYear);
     });
+
+    window.exportData = function() {
+        const dataToExport = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('rast_')) dataToExport[key] = localStorage.getItem(key);
+        }
+        let fileName = prompt("Nome do arquivo:", "rast_backup");
+        if (!fileName) return;
+        const dataStr = JSON.stringify(dataToExport, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${fileName}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    window.triggerImport = function() { document.getElementById('import-file').click(); };
+    document.getElementById('import-file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                Object.keys(data).forEach(key => { if (key.startsWith('rast_')) localStorage.setItem(key, data[key]); });
+                alert("Importado com sucesso!"); location.reload();
+            } catch (err) { alert("Erro ao ler arquivo."); }
+        };
+        reader.readAsText(file);
+    });
+
+    window.resetAllData = function() {
+        if (confirm("ATENÇÃO: Apagar TUDO?")) { localStorage.clear(); location.reload(); }
+    };
+
 
     // ==========================================
     // 8. INTERFACE DO MODAL
@@ -430,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.closeModal = function() {
         modal.classList.remove('open');
-        resetFormState(); // Limpa se fechar sem salvar
+        resetFormState();
     }
 
     window.switchTab = function(tabName) {
@@ -456,13 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
         records.forEach(item => {
             const div = document.createElement('div');
             div.className = `record-item ${item.type === 'agenda' ? 'agenda-type' : ''}`;
-            
-            // Renderiza botões de Editar (Lápis) e Excluir (X)
             div.innerHTML = `
-                <div class="record-info">
-                    <h4>${item.title}</h4>
-                    <p>${item.detail}</p>
-                </div>
+                <div class="record-info"><h4>${item.title}</h4><p>${item.detail}</p></div>
                 <div class="btns-container">
                     <div class="edit-btn" onclick="startEdit(${item.id})" title="Editar">✎</div>
                     <div class="delete-btn" onclick="deleteRecord(${item.id})" title="Excluir">&times;</div>
@@ -474,8 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ==========================================
     // 9. INICIALIZAÇÃO FINAL
-    // ================================
-    
+    // ==========================================
     renderCalendar(currentMonth, currentYear);
 
     const initDate = new Date();
@@ -483,4 +493,4 @@ document.addEventListener('DOMContentLoaded', () => {
     const initString = `${initDate.getDate()} de ${months[initDate.getMonth()]}`;
     updateDailySummary(initKey, initString);
     currentSelectedDateKey = initKey;
-    });
+});
