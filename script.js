@@ -271,6 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('agenda-form').addEventListener('submit', (e) => {
         e.preventDefault();
+        requestNotificationPermission(); // Pede permissão ao tentar salvar
         const title = e.target.querySelector('input[type="text"]').value;
         const timeInput = e.target.querySelector('input[type="time"]').value;
         const notes = e.target.querySelector('textarea').value;
@@ -494,3 +495,96 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDailySummary(initKey, initString);
     currentSelectedDateKey = initKey;
 });
+
+// ==========================================
+    // 10. SISTEMA DE NOTIFICAÇÕES E ALARMES (NOVO)
+    // ==========================================
+
+    // 1. Pedir permissão para notificar
+    function requestNotificationPermission() {
+        if (!("Notification" in window)) {
+            alert("Este navegador não suporta notificações de sistema.");
+            return;
+        }
+
+        if (Notification.permission === "granted") {
+            return; // Já temos permissão
+        }
+
+        if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((permission) => {
+                if (permission === "granted") {
+                    new Notification("rast.", {
+                        body: "Notificações ativadas! Você será avisado dos seus eventos.",
+                        icon: "icon-192.png"
+                    });
+                }
+            });
+        }
+    }
+
+    // Chama o pedido de permissão assim que o usuário interagir com o app (ex: ao abrir o menu)
+    // Ou você pode chamar direto no final do arquivo, mas navegadores preferem que seja após um clique.
+    // Vamos adicionar ao botão de salvar agenda para garantir.
+
+    // 2. O "Vigia" que checa os horários a cada minuto
+    function checkAlarms() {
+        if (Notification.permission !== "granted") return;
+
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMin = now.getMinutes();
+
+        // Formata a data de hoje para buscar no localStorage (ano-mes-dia)
+        // Nota: no script principal usamos meses 0-11, aqui precisamos alinhar
+        const y = now.getFullYear();
+        const m = now.getMonth(); 
+        const d = now.getDate();
+        
+        // Chave do dia de hoje
+        const todayKey = `rast_${y}-${m}-${d}`;
+        const records = JSON.parse(localStorage.getItem(todayKey)) || [];
+
+        records.forEach(item => {
+            // Só interessa se for Agenda e tiver alarme configurado
+            if (item.type === 'agenda' && item.rawTime && item.detail.includes('antes')) {
+                
+                // Pega o horário do evento (ex: "14:30")
+                const [eventH, eventM] = item.rawTime.split(':').map(Number);
+                
+                // Descobre de quantos minutos é o alarme (15 ou 60)
+                let alarmOffset = 0;
+                if (item.detail.includes('15 min')) alarmOffset = 15;
+                if (item.detail.includes('1 hora')) alarmOffset = 60;
+
+                if (alarmOffset === 0) return;
+
+                // Cria data do evento
+                const eventDate = new Date();
+                eventDate.setHours(eventH, eventM, 0);
+
+                // Subtrai o tempo do alarme para saber a "Hora de Disparar"
+                const triggerDate = new Date(eventDate.getTime() - (alarmOffset * 60000));
+                
+                // Verifica se AGORA é o momento exato (comparando hora e minuto)
+                if (triggerDate.getHours() === currentHour && triggerDate.getMinutes() === currentMin) {
+                    
+                    // Para não floodar, verificamos se já foi notificado (podemos usar uma flag no item, 
+                    // mas para simplificar, confiamos que o minuto passa rápido. 
+                    // O ideal é usar uma tag na notificação).
+                    
+                    new Notification(`Lembrete: ${item.title}`, {
+                        body: `Seu evento é às ${item.rawTime}. Prepare-se!`,
+                        icon: "icon-192.png",
+                        tag: `alarm-${item.id}` // Evita notificações duplicadas
+                    });
+                }
+            }
+        });
+    }
+
+    // Inicia o vigia (roda a cada 60 segundos)
+    setInterval(checkAlarms, 60000);
+
+    // DICA: Adicione a chamada requestNotificationPermission() 
+    // dentro do evento de 'submit' do formulário da agenda.
